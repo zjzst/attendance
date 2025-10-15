@@ -1,0 +1,28 @@
+name: 打卡入库
+on:
+  repository_dispatch:
+    types: [attend]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 写入文件
+        run: |
+          DATE=$(date '+%Y-%m-%d')
+          mkdir -p attendance
+          FILE="attendance/${DATE}.json"
+          [ ! -f "$FILE" ] && echo '[]' > "$FILE"
+          jq '. += [input]' "$FILE" <<< '${{ toJson(github.event.client_payload) }}' > tmp && mv tmp "$FILE"
+      - name: 提交并推送
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add attendance/
+          git diff --quiet && git diff --staged --quiet || \
+          (git commit -m "打卡 ${{ github.event.client_payload.studentName }}" && git push)
